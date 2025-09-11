@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Calendar, TrendingUp, Users, Play, Square, AlertCircle } from 'lucide-react';
-import { User, AttendanceRecord } from '../types';
+import { Clock, Calendar, TrendingUp, Play, Square, AlertCircle } from 'lucide-react';
+import { AttendanceRecord } from '../types';
 
 interface DashboardProps {
-  user: User;
   attendanceRecords: AttendanceRecord[];
   setAttendanceRecords: React.Dispatch<React.SetStateAction<AttendanceRecord[]>>;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ user, attendanceRecords, setAttendanceRecords }) => {
+const Dashboard: React.FC<DashboardProps> = ({ attendanceRecords, setAttendanceRecords }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isWorking, setIsWorking] = useState(false);
   const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null);
@@ -23,10 +22,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, attendanceRecords, setAtten
 
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
-    const record = attendanceRecords.find(r => r.userId === user.id && r.date === today);
+    const record = attendanceRecords.find(r => r.date === today);
     setTodayRecord(record || null);
     setIsWorking(record?.clockIn && !record?.clockOut);
-  }, [attendanceRecords, user.id]);
+  }, [attendanceRecords]);
 
   const handleClockInOut = () => {
     const today = new Date().toISOString().split('T')[0];
@@ -40,7 +39,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, attendanceRecords, setAtten
       // Clock In
       const newRecord: AttendanceRecord = {
         id: Date.now().toString(),
-        userId: user.id,
         date: today,
         clockIn: currentTimeStr,
         totalHours: 0,
@@ -52,7 +50,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, attendanceRecords, setAtten
     } else {
       // Clock Out
       setAttendanceRecords(prev => prev.map(record => {
-        if (record.userId === user.id && record.date === today && !record.clockOut) {
+        if (record.date === today && !record.clockOut) {
           const clockInTime = new Date(`${today} ${record.clockIn}`);
           const clockOutTime = new Date(`${today} ${currentTimeStr}`);
           const totalHours = (clockOutTime.getTime() - clockInTime.getTime()) / (1000 * 60 * 60);
@@ -84,7 +82,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, attendanceRecords, setAtten
       const recordDate = new Date(record.date);
       const today = new Date();
       const weekStart = new Date(today.setDate(today.getDate() - today.getDay()));
-      return recordDate >= weekStart && record.userId === user.id;
+      return recordDate >= weekStart;
     });
     
     return thisWeekRecords.reduce((total, record) => total + record.totalHours, 0);
@@ -98,8 +96,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, attendanceRecords, setAtten
       .filter(record => {
         const recordDate = new Date(record.date);
         return recordDate.getMonth() === thisMonth && 
-               recordDate.getFullYear() === thisYear && 
-               record.userId === user.id;
+               recordDate.getFullYear() === thisYear;
       })
       .reduce((total, record) => total + record.totalHours, 0);
   };
@@ -133,18 +130,21 @@ const Dashboard: React.FC<DashboardProps> = ({ user, attendanceRecords, setAtten
       title: 'Attendance Rate',
       value: '98.5',
       unit: '%',
-      icon: Users,
+      icon: Calendar,
       color: 'bg-orange-500',
       change: '+1.2 from last month'
     }
   ];
 
-  const recentActivity = [
-    { time: '09:00 AM', action: 'Clocked in', status: 'success' },
-    { time: '12:30 PM', action: 'Break started', status: 'info' },
-    { time: '01:00 PM', action: 'Break ended', status: 'info' },
-    { time: '05:30 PM', action: 'Clocked out', status: 'success' }
-  ];
+  const recentActivity = attendanceRecords
+    .slice(-5)
+    .reverse()
+    .map(record => ({
+      date: new Date(record.date).toLocaleDateString(),
+      clockIn: record.clockIn || '-',
+      clockOut: record.clockOut || 'In Progress',
+      hours: record.totalHours.toFixed(1)
+    }));
 
   return (
     <div className="space-y-6">
@@ -231,54 +231,37 @@ const Dashboard: React.FC<DashboardProps> = ({ user, attendanceRecords, setAtten
         })}
       </div>
 
-      {/* Recent Activity & Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Activity */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
-          <div className="space-y-3">
-            {recentActivity.map((activity, index) => (
-              <div key={index} className="flex items-center space-x-3">
-                <div className={`w-2 h-2 rounded-full ${
-                  activity.status === 'success' ? 'bg-green-500' : 'bg-blue-500'
-                }`}></div>
-                <div className="flex-1">
-                  <p className="text-sm text-gray-900">{activity.action}</p>
-                  <p className="text-xs text-gray-500">{activity.time}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-          <div className="space-y-3">
-            <button className="w-full flex items-center justify-between p-3 text-left border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-              <div>
-                <p className="font-medium text-gray-900">Request Leave</p>
-                <p className="text-sm text-gray-500">Apply for time off</p>
-              </div>
-              <Calendar className="w-5 h-5 text-gray-400" />
-            </button>
-            
-            <button className="w-full flex items-center justify-between p-3 text-left border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-              <div>
-                <p className="font-medium text-gray-900">View Timesheet</p>
-                <p className="text-sm text-gray-500">Check your hours</p>
-              </div>
-              <Clock className="w-5 h-5 text-gray-400" />
-            </button>
-            
-            <button className="w-full flex items-center justify-between p-3 text-left border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-              <div>
-                <p className="font-medium text-gray-900">Download Report</p>
-                <p className="text-sm text-gray-500">Export attendance data</p>
-              </div>
-              <TrendingUp className="w-5 h-5 text-gray-400" />
-            </button>
-          </div>
+      {/* Recent Activity */}
+      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="text-left py-2 text-sm font-medium text-gray-600">Date</th>
+                <th className="text-left py-2 text-sm font-medium text-gray-600">Clock In</th>
+                <th className="text-left py-2 text-sm font-medium text-gray-600">Clock Out</th>
+                <th className="text-left py-2 text-sm font-medium text-gray-600">Hours</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentActivity.map((activity, index) => (
+                <tr key={index} className="border-b border-gray-100">
+                  <td className="py-3 text-sm text-gray-900">{activity.date}</td>
+                  <td className="py-3 text-sm text-gray-900">{activity.clockIn}</td>
+                  <td className="py-3 text-sm text-gray-900">{activity.clockOut}</td>
+                  <td className="py-3 text-sm text-gray-900">{activity.hours}h</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          
+          {recentActivity.length === 0 && (
+            <div className="text-center py-8">
+              <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">No attendance records yet. Clock in to get started!</p>
+            </div>
+          )}
         </div>
       </div>
 

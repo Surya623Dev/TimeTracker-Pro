@@ -1,22 +1,26 @@
 import React, { useState } from 'react';
 import { Calendar, Clock, Download, Filter, Search } from 'lucide-react';
-import { User, AttendanceRecord } from '../types';
+import { AttendanceRecord } from '../types';
 
 interface TimesheetProps {
-  user: User;
   attendanceRecords: AttendanceRecord[];
 }
 
-const Timesheet: React.FC<TimesheetProps> = ({ user, attendanceRecords }) => {
+const Timesheet: React.FC<TimesheetProps> = ({ attendanceRecords }) => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [searchTerm, setSearchTerm] = useState('');
 
-  const userRecords = attendanceRecords.filter(record => 
-    record.userId === user.id &&
-    new Date(record.date).getMonth() === selectedMonth &&
-    new Date(record.date).getFullYear() === selectedYear
-  );
+  const filteredRecords = attendanceRecords.filter(record => {
+    const recordDate = new Date(record.date);
+    const matchesDate = recordDate.getMonth() === selectedMonth && recordDate.getFullYear() === selectedYear;
+    const matchesSearch = searchTerm === '' || 
+      record.date.includes(searchTerm) || 
+      record.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (record.notes && record.notes.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    return matchesDate && matchesSearch;
+  });
 
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -26,11 +30,11 @@ const Timesheet: React.FC<TimesheetProps> = ({ user, attendanceRecords }) => {
   const years = [2022, 2023, 2024, 2025];
 
   const getTotalHours = () => {
-    return userRecords.reduce((total, record) => total + record.totalHours, 0);
+    return filteredRecords.reduce((total, record) => total + record.totalHours, 0);
   };
 
   const getWorkingDays = () => {
-    return userRecords.filter(record => record.status === 'present').length;
+    return filteredRecords.filter(record => record.status === 'present').length;
   };
 
   const getAverageHours = () => {
@@ -39,11 +43,11 @@ const Timesheet: React.FC<TimesheetProps> = ({ user, attendanceRecords }) => {
     return workingDays > 0 ? totalHours / workingDays : 0;
   };
 
-  const exportData = (format: 'csv' | 'pdf') => {
+  const exportData = (format: 'csv') => {
     if (format === 'csv') {
       const csvContent = [
         ['Date', 'Clock In', 'Clock Out', 'Total Hours', 'Status', 'Notes'],
-        ...userRecords.map(record => [
+        ...filteredRecords.map(record => [
           record.date,
           record.clockIn || '',
           record.clockOut || '',
@@ -62,7 +66,6 @@ const Timesheet: React.FC<TimesheetProps> = ({ user, attendanceRecords }) => {
       a.click();
       window.URL.revokeObjectURL(url);
     }
-    // PDF export would require a library like jsPDF
   };
 
   const getStatusColor = (status: string) => {
@@ -96,13 +99,6 @@ const Timesheet: React.FC<TimesheetProps> = ({ user, attendanceRecords }) => {
           >
             <Download className="w-4 h-4 mr-2" />
             Export CSV
-          </button>
-          <button 
-            onClick={() => exportData('pdf')}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Export PDF
           </button>
         </div>
       </div>
@@ -143,8 +139,8 @@ const Timesheet: React.FC<TimesheetProps> = ({ user, attendanceRecords }) => {
           <div className="flex items-center">
             <Calendar className="w-8 h-8 text-orange-600" />
             <div className="ml-4">
-              <p className="text-2xl font-bold text-gray-900">8.5</p>
-              <p className="text-sm text-gray-600">Expected Hours</p>
+              <p className="text-2xl font-bold text-gray-900">8.0</p>
+              <p className="text-sm text-gray-600">Target Hours</p>
             </div>
           </div>
         </div>
@@ -218,7 +214,7 @@ const Timesheet: React.FC<TimesheetProps> = ({ user, attendanceRecords }) => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {userRecords.map((record) => (
+              {filteredRecords.map((record) => (
                 <tr key={record.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {new Date(record.date).toLocaleDateString('en-US', {
@@ -250,7 +246,7 @@ const Timesheet: React.FC<TimesheetProps> = ({ user, attendanceRecords }) => {
           </table>
         </div>
 
-        {userRecords.length === 0 && (
+        {filteredRecords.length === 0 && (
           <div className="text-center py-12">
             <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No records found</h3>

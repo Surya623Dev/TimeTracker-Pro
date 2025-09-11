@@ -2,31 +2,20 @@ import React from 'react';
 import { 
   LayoutDashboard, 
   Clock, 
-  Calendar, 
-  FileText, 
-  Settings,
-  Users,
-  BarChart3
+  FileText
 } from 'lucide-react';
 
 interface SidebarProps {
   currentView: string;
   setCurrentView: (view: string) => void;
-  userRole: 'admin' | 'manager' | 'employee';
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, userRole }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView }) => {
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'manager', 'employee'] },
-    { id: 'timesheet', label: 'Timesheet', icon: Clock, roles: ['admin', 'manager', 'employee'] },
-    { id: 'leaves', label: 'Leave Management', icon: Calendar, roles: ['admin', 'manager', 'employee'] },
-    { id: 'reports', label: 'Reports', icon: FileText, roles: ['admin', 'manager'] },
-    { id: 'users', label: 'User Management', icon: Users, roles: ['admin'] },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3, roles: ['admin', 'manager'] },
-    { id: 'settings', label: 'Settings', icon: Settings, roles: ['admin', 'manager', 'employee'] }
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'timesheet', label: 'Timesheet', icon: Clock },
+    { id: 'reports', label: 'Reports', icon: FileText }
   ];
-
-  const filteredMenuItems = menuItems.filter(item => item.roles.includes(userRole));
 
   return (
     <div className="w-64 bg-white shadow-lg border-r border-gray-200">
@@ -37,14 +26,14 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, userRole
           </div>
           <div className="ml-3">
             <h1 className="text-lg font-bold text-gray-900">TimeTracker</h1>
-            <p className="text-sm text-gray-500">Pro</p>
+            <p className="text-sm text-gray-500">Personal</p>
           </div>
         </div>
       </div>
 
       <nav className="mt-6 px-3">
         <ul className="space-y-1">
-          {filteredMenuItems.map((item) => {
+          {menuItems.map((item) => {
             const IconComponent = item.icon;
             const isActive = currentView === item.id;
             
@@ -71,7 +60,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, userRole
 
       <div className="absolute bottom-0 w-64 p-4 border-t border-gray-200 bg-gray-50">
         <div className="text-xs text-gray-500 text-center">
-          <p>© 2024 TimeTracker Pro</p>
+          <p>© 2024 Personal TimeTracker</p>
           <p className="mt-1">Version 1.0.0</p>
         </div>
       </div>

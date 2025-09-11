@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
-import { Download, Calendar, TrendingUp, Users, Clock, BarChart3, PieChart } from 'lucide-react';
-import { User, AttendanceRecord } from '../types';
+import { Download, Calendar, TrendingUp, Clock, BarChart3, PieChart } from 'lucide-react';
+import { AttendanceRecord } from '../types';
 
 interface ReportsProps {
-  user: User;
   attendanceRecords: AttendanceRecord[];
 }
 
-const Reports: React.FC<ReportsProps> = ({ user, attendanceRecords }) => {
+const Reports: React.FC<ReportsProps> = ({ attendanceRecords }) => {
   const [selectedPeriod, setSelectedPeriod] = useState('monthly');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -26,42 +25,100 @@ const Reports: React.FC<ReportsProps> = ({ user, attendanceRecords }) => {
 
   const years = [2022, 2023, 2024, 2025];
 
-  // Mock chart data for demonstration
-  const chartData = {
-    productivity: [
-      { month: 'Jan', hours: 168, target: 160 },
-      { month: 'Feb', hours: 152, target: 160 },
-      { month: 'Mar', hours: 172, target: 160 },
-      { month: 'Apr', hours: 164, target: 160 },
-      { month: 'May', hours: 158, target: 160 },
-      { month: 'Jun', hours: 176, target: 160 }
-    ],
-    attendance: [
-      { status: 'Present', count: 142, percentage: 85 },
-      { status: 'Late', count: 12, percentage: 7 },
-      { status: 'Absent', count: 8, percentage: 5 },
-      { status: 'Early Leave', count: 5, percentage: 3 }
-    ]
+  const getFilteredRecords = () => {
+    return attendanceRecords.filter(record => {
+      const recordDate = new Date(record.date);
+      
+      if (selectedPeriod === 'monthly') {
+        return recordDate.getMonth() === selectedMonth && recordDate.getFullYear() === selectedYear;
+      } else if (selectedPeriod === 'yearly') {
+        return recordDate.getFullYear() === selectedYear;
+      }
+      
+      return true; // For weekly and quarterly, return all for now
+    });
   };
 
-  const generateReport = (format: 'csv' | 'pdf' | 'excel') => {
-    // This would typically generate and download a report
-    console.log(`Generating ${format} report for ${selectedPeriod} period`);
-    alert(`${format.toUpperCase()} report generated successfully!`);
+  const generateReport = (format: 'csv' | 'excel') => {
+    const filteredRecords = getFilteredRecords();
+    
+    if (format === 'csv') {
+      const csvContent = [
+        ['Date', 'Clock In', 'Clock Out', 'Total Hours', 'Status', 'Notes'],
+        ...filteredRecords.map(record => [
+          record.date,
+          record.clockIn || '',
+          record.clockOut || '',
+          record.totalHours.toString(),
+          record.status,
+          record.notes || ''
+        ])
+      ];
+      
+      const csvString = csvContent.map(row => row.join(',')).join('\n');
+      const blob = new Blob([csvString], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `report-${selectedPeriod}-${selectedYear}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    }
   };
 
   const getDashboardStats = () => {
+    const filteredRecords = getFilteredRecords();
+    
     return {
-      totalHours: attendanceRecords.reduce((sum, record) => sum + record.totalHours, 0),
-      averageHours: attendanceRecords.length > 0 ? 
-        attendanceRecords.reduce((sum, record) => sum + record.totalHours, 0) / attendanceRecords.length : 0,
-      presentDays: attendanceRecords.filter(record => record.status === 'present').length,
-      attendanceRate: attendanceRecords.length > 0 ? 
-        (attendanceRecords.filter(record => record.status === 'present').length / attendanceRecords.length) * 100 : 0
+      totalHours: filteredRecords.reduce((sum, record) => sum + record.totalHours, 0),
+      averageHours: filteredRecords.length > 0 ? 
+        filteredRecords.reduce((sum, record) => sum + record.totalHours, 0) / filteredRecords.length : 0,
+      presentDays: filteredRecords.filter(record => record.status === 'present').length,
+      attendanceRate: filteredRecords.length > 0 ? 
+        (filteredRecords.filter(record => record.status === 'present').length / filteredRecords.length) * 100 : 0
     };
   };
 
+  const getMonthlyData = () => {
+    const monthlyData = [];
+    for (let i = 0; i < 12; i++) {
+      const monthRecords = attendanceRecords.filter(record => {
+        const recordDate = new Date(record.date);
+        return recordDate.getMonth() === i && recordDate.getFullYear() === selectedYear;
+      });
+      
+      const totalHours = monthRecords.reduce((sum, record) => sum + record.totalHours, 0);
+      monthlyData.push({
+        month: months[i].substring(0, 3),
+        hours: totalHours,
+        target: 160 // 8 hours * 20 working days
+      });
+    }
+    return monthlyData;
+  };
+
+  const getAttendanceBreakdown = () => {
+    const filteredRecords = getFilteredRecords();
+    const breakdown = {
+      present: filteredRecords.filter(r => r.status === 'present').length,
+      late: filteredRecords.filter(r => r.status === 'late').length,
+      absent: filteredRecords.filter(r => r.status === 'absent').length,
+      earlyLeave: filteredRecords.filter(r => r.status === 'early_leave').length
+    };
+    
+    const total = Object.values(breakdown).reduce((sum, count) => sum + count, 0);
+    
+    return [
+      { status: 'Present', count: breakdown.present, percentage: total > 0 ? Math.round((breakdown.present / total) * 100) : 0 },
+      { status: 'Late', count: breakdown.late, percentage: total > 0 ? Math.round((breakdown.late / total) * 100) : 0 },
+      { status: 'Absent', count: breakdown.absent, percentage: total > 0 ? Math.round((breakdown.absent / total) * 100) : 0 },
+      { status: 'Early Leave', count: breakdown.earlyLeave, percentage: total > 0 ? Math.round((breakdown.earlyLeave / total) * 100) : 0 }
+    ];
+  };
+
   const stats = getDashboardStats();
+  const monthlyData = getMonthlyData();
+  const attendanceBreakdown = getAttendanceBreakdown();
 
   return (
     <div className="space-y-6">
@@ -82,17 +139,10 @@ const Reports: React.FC<ReportsProps> = ({ user, attendanceRecords }) => {
           </button>
           <button
             onClick={() => generateReport('excel')}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Excel
-          </button>
-          <button
-            onClick={() => generateReport('pdf')}
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
           >
             <Download className="w-4 h-4 mr-2" />
-            PDF Report
+            Excel
           </button>
         </div>
       </div>
@@ -149,7 +199,7 @@ const Reports: React.FC<ReportsProps> = ({ user, attendanceRecords }) => {
             <div className="ml-4">
               <p className="text-2xl font-bold text-gray-900">{stats.totalHours.toFixed(1)}h</p>
               <p className="text-sm text-gray-600">Total Hours</p>
-              <p className="text-xs text-green-600 mt-1">+5.2% vs last month</p>
+              <p className="text-xs text-green-600 mt-1">+5.2% vs last period</p>
             </div>
           </div>
         </div>
@@ -178,7 +228,7 @@ const Reports: React.FC<ReportsProps> = ({ user, attendanceRecords }) => {
 
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
           <div className="flex items-center">
-            <Users className="w-8 h-8 text-orange-600" />
+            <BarChart3 className="w-8 h-8 text-orange-600" />
             <div className="ml-4">
               <p className="text-2xl font-bold text-gray-900">{stats.attendanceRate.toFixed(1)}%</p>
               <p className="text-sm text-gray-600">Attendance Rate</p>
@@ -190,12 +240,12 @@ const Reports: React.FC<ReportsProps> = ({ user, attendanceRecords }) => {
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Productivity Chart */}
+        {/* Monthly Hours Chart */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-semibold text-gray-900 flex items-center">
               <BarChart3 className="w-5 h-5 mr-2" />
-              Monthly Productivity
+              Monthly Hours ({selectedYear})
             </h3>
             <div className="flex space-x-2">
               <div className="flex items-center text-sm">
@@ -210,16 +260,16 @@ const Reports: React.FC<ReportsProps> = ({ user, attendanceRecords }) => {
           </div>
           
           <div className="h-64 flex items-end justify-between space-x-2">
-            {chartData.productivity.map((item, index) => (
+            {monthlyData.map((item, index) => (
               <div key={index} className="flex flex-col items-center flex-1">
                 <div className="w-full flex flex-col items-center space-y-1">
                   <div 
                     className="w-8 bg-blue-500 rounded-t"
-                    style={{ height: `${(item.hours / 180) * 200}px` }}
+                    style={{ height: `${Math.max((item.hours / 200) * 200, 4)}px` }}
                   ></div>
                   <div 
-                    className="w-8 bg-gray-300 rounded-t"
-                    style={{ height: `${(item.target / 180) * 200}px` }}
+                    className="w-8 bg-gray-300 rounded-t opacity-50"
+                    style={{ height: `${(item.target / 200) * 200}px` }}
                   ></div>
                 </div>
                 <span className="text-xs text-gray-600 mt-2">{item.month}</span>
@@ -238,7 +288,7 @@ const Reports: React.FC<ReportsProps> = ({ user, attendanceRecords }) => {
           </div>
           
           <div className="space-y-4">
-            {chartData.attendance.map((item, index) => (
+            {attendanceBreakdown.map((item, index) => (
               <div key={index} className="flex items-center justify-between">
                 <div className="flex items-center">
                   <div className={`w-4 h-4 rounded mr-3 ${
@@ -258,31 +308,41 @@ const Reports: React.FC<ReportsProps> = ({ user, attendanceRecords }) => {
           
           <div className="mt-6 pt-4 border-t border-gray-200">
             <div className="text-center">
-              <p className="text-sm text-gray-600">Total Days: 167</p>
-              <p className="text-lg font-semibold text-green-600 mt-1">Excellent Performance</p>
+              <p className="text-sm text-gray-600">Total Days: {attendanceBreakdown.reduce((sum, item) => sum + item.count, 0)}</p>
+              <p className="text-lg font-semibold text-green-600 mt-1">
+                {stats.attendanceRate > 90 ? 'Excellent Performance' : 
+                 stats.attendanceRate > 80 ? 'Good Performance' : 
+                 'Needs Improvement'}
+              </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Detailed Analytics */}
+      {/* Performance Insights */}
       <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
         <h3 className="text-lg font-semibold text-gray-900 mb-6">Performance Insights</h3>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div className="p-4 bg-blue-50 rounded-lg">
-            <h4 className="font-medium text-blue-900 mb-2">Peak Performance Hours</h4>
-            <p className="text-sm text-blue-700">Your most productive hours are between 9:00 AM - 11:00 AM</p>
+            <h4 className="font-medium text-blue-900 mb-2">Average Daily Hours</h4>
+            <p className="text-sm text-blue-700">
+              You're averaging {stats.averageHours.toFixed(1)} hours per day
+            </p>
           </div>
           
           <div className="p-4 bg-green-50 rounded-lg">
-            <h4 className="font-medium text-green-900 mb-2">Consistency Rating</h4>
-            <p className="text-sm text-green-700">95% consistent arrival time within 15 minutes of schedule</p>
+            <h4 className="font-medium text-green-900 mb-2">Attendance Consistency</h4>
+            <p className="text-sm text-green-700">
+              {stats.attendanceRate.toFixed(1)}% attendance rate this period
+            </p>
           </div>
           
           <div className="p-4 bg-purple-50 rounded-lg">
-            <h4 className="font-medium text-purple-900 mb-2">Overtime Trend</h4>
-            <p className="text-sm text-purple-700">Average 2.3 hours overtime per week</p>
+            <h4 className="font-medium text-purple-900 mb-2">Total Hours Tracked</h4>
+            <p className="text-sm text-purple-700">
+              {stats.totalHours.toFixed(1)} hours logged in selected period
+            </p>
           </div>
         </div>
       </div>
