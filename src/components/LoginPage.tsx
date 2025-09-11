@@ -1,139 +1,140 @@
 import React, { useState } from 'react';
-import { Clock, Users, Shield, LogIn } from 'lucide-react';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../config/firebase';
+import { Clock, Mail, Lock, User, AlertCircle } from 'lucide-react';
 
 interface LoginPageProps {
-  onLogin: (email: string, password: string) => boolean;
+  onLogin: (user: any) => void;
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
+  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
     setError('');
-    setIsLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      const success = onLogin(email, password);
-      if (!success) {
-        setError('Invalid email or password');
+    try {
+      let userCredential;
+      if (isLogin) {
+        userCredential = await signInWithEmailAndPassword(auth, email, password);
+      } else {
+        userCredential = await createUserWithEmailAndPassword(auth, email, password);
       }
-      setIsLoading(false);
-    }, 1000);
+      onLogin(userCredential.user);
+    } catch (error: any) {
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const demoAccounts = [
-    { role: 'Admin', email: 'admin@company.com', icon: Shield },
-    { role: 'Manager', email: 'manager@company.com', icon: Users },
-    { role: 'Employee', email: 'employee@company.com', icon: Clock }
-  ];
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <div className="mx-auto h-16 w-16 bg-blue-600 rounded-full flex items-center justify-center">
-            <Clock className="h-8 w-8 text-white" />
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="max-w-md w-full">
+        <div className="bg-white rounded-2xl shadow-xl p-8">
+          {/* Logo and Header */}
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
+              <Clock className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900">Personal TimeTracker</h1>
+            <p className="text-gray-600 mt-2">
+              {isLogin ? 'Welcome back! Sign in to continue.' : 'Create your account to get started.'}
+            </p>
           </div>
-          <h2 className="mt-6 text-3xl font-bold text-gray-900">TimeTracker Pro</h2>
-          <p className="mt-2 text-sm text-gray-600">Advanced Office Attendance Management</p>
-        </div>
 
-        <div className="bg-white py-8 px-6 shadow-xl rounded-lg">
-          <form className="space-y-6" onSubmit={handleSubmit}>
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center">
+              <AlertCircle className="w-5 h-5 text-red-600 mr-3" />
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                 Email Address
               </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 appearance-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm transition-colors"
-                placeholder="Enter your email"
-              />
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  placeholder="Enter your email"
+                />
+              </div>
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                 Password
               </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 appearance-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm transition-colors"
-                placeholder="Enter your password"
-              />
-            </div>
-
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
-                {error}
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                  placeholder="Enter your password"
+                />
               </div>
-            )}
+            </div>
 
             <button
               type="submit"
-              disabled={isLoading}
-              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              disabled={loading}
+              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              {loading ? (
+                <div className="flex items-center justify-center">
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                  {isLogin ? 'Signing In...' : 'Creating Account...'}
+                </div>
               ) : (
-                <>
-                  <LogIn className="w-4 h-4 mr-2" />
-                  Sign In
-                </>
+                isLogin ? 'Sign In' : 'Create Account'
               )}
             </button>
           </form>
 
-          <div className="mt-8">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Demo Accounts</span>
-              </div>
-            </div>
+          {/* Toggle between login and signup */}
+          <div className="mt-6 text-center">
+            <button
+              onClick={() => {
+                setIsLogin(!isLogin);
+                setError('');
+              }}
+              className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
+            >
+              {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
+            </button>
+          </div>
 
-            <div className="mt-6 grid grid-cols-1 gap-3">
-              {demoAccounts.map((account) => {
-                const IconComponent = account.icon;
-                return (
-                  <button
-                    key={account.role}
-                    onClick={() => {
-                      setEmail(account.email);
-                      setPassword('password');
-                    }}
-                    className="w-full flex items-center px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-left"
-                  >
-                    <IconComponent className="w-5 h-5 text-gray-400 mr-3" />
-                    <div>
-                      <div className="font-medium text-gray-900">{account.role}</div>
-                      <div className="text-sm text-gray-500">{account.email}</div>
-                    </div>
-                  </button>
-                );
-              })}
+          {/* Firebase Setup Notice */}
+          <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-start">
+              <AlertCircle className="w-5 h-5 text-yellow-600 mr-3 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-yellow-800">Firebase Setup Required</p>
+                <p className="text-sm text-yellow-700 mt-1">
+                  Please update the Firebase configuration in <code className="bg-yellow-100 px-1 rounded">src/config/firebase.ts</code> with your project credentials.
+                </p>
+              </div>
             </div>
-            
-            <p className="mt-4 text-xs text-gray-500 text-center">
-              Password: <span className="font-mono bg-gray-100 px-1 py-0.5 rounded">password</span>
-            </p>
           </div>
         </div>
       </div>

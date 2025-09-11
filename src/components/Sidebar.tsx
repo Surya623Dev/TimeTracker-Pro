@@ -8,9 +8,11 @@ import {
 interface SidebarProps {
   currentView: string;
   setCurrentView: (view: string) => void;
+  user: any;
+  onLogout: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, user, onLogout }) => {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'timesheet', label: 'Timesheet', icon: Clock },
@@ -26,7 +28,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView }) => {
           </div>
           <div className="ml-3">
             <h1 className="text-lg font-bold text-gray-900">TimeTracker</h1>
-            <p className="text-sm text-gray-500">Personal</p>
+            <p className="text-sm text-gray-500">Personal Tracker</p>
           </div>
         </div>
       </div>
@@ -58,10 +60,30 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView }) => {
         </ul>
       </nav>
 
-      <div className="absolute bottom-0 w-64 p-4 border-t border-gray-200 bg-gray-50">
-        <div className="text-xs text-gray-500 text-center">
-          <p>© 2024 Personal TimeTracker</p>
-          <p className="mt-1">Version 1.0.0</p>
+      <div className="absolute bottom-0 w-64 p-4 border-t border-gray-200 bg-white">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+              <span className="text-sm font-medium text-blue-600">
+                {user?.email?.charAt(0).toUpperCase()}
+              </span>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-900 truncate">
+                {user?.email?.split('@')[0]}
+              </p>
+              <p className="text-xs text-gray-500">Online</p>
+            </div>
+          </div>
+          <button
+            onClick={onLogout}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+            title="Sign out"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+          </button>
         </div>
       </div>
     </div>
