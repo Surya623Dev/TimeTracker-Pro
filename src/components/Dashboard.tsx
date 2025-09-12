@@ -11,92 +11,22 @@ const Dashboard: React.FC<DashboardProps> = ({ attendanceRecords, setAttendanceR
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isWorking, setIsWorking] = useState(false);
   const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null);
-  const [isOnBreak, setIsOnBreak] = useState(false);
-  const [currentBreakStart, setCurrentBreakStart] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
-      
-      // Check for automatic logout at 11:59 PM
-      const now = new Date();
-      if (now.getHours() === 23 && now.getMinutes() === 59) {
-        const today = new Date().toISOString().split('T')[0];
-        const todaysRecord = attendanceRecords.find(r => r.date === today);
-        
-        // Only auto logout if user is still working (hasn't logged out manually)
-        if (todaysRecord && todaysRecord.clockIn && !todaysRecord.clockOut) {
-          handleAutoLogout();
-        }
-      }
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [attendanceRecords]);
+  }, []);
 
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
     const record = attendanceRecords.find(r => r.date === today);
     setTodayRecord(record || null);
     setIsWorking(record?.clockIn && !record?.clockOut);
-    
-    // Check if currently on break
-    if (record?.breaks) {
-      const activeBreak = record.breaks.find(b => b.startTime && !b.endTime);
-      setIsOnBreak(!!activeBreak);
-      setCurrentBreakStart(activeBreak?.startTime || null);
-    }
   }, [attendanceRecords]);
 
-  const handleAutoLogout = () => {
-    const today = new Date().toISOString().split('T')[0];
-    const currentTimeStr = '23:59';
-
-    setAttendanceRecords(prev => prev.map(record => {
-      if (record.date === today && !record.clockOut) {
-        // End any active break
-        let updatedBreaks = record.breaks || [];
-        if (isOnBreak && currentBreakStart) {
-          updatedBreaks = updatedBreaks.map(breakItem => 
-            breakItem.startTime === currentBreakStart && !breakItem.endTime
-              ? { ...breakItem, endTime: currentTimeStr }
-              : breakItem
-          );
-        }
-
-        // Calculate total break time
-        const totalBreakMinutes = updatedBreaks.reduce((total, breakItem) => {
-          if (breakItem.startTime && breakItem.endTime) {
-            const start = new Date(`${today} ${breakItem.startTime}`);
-            const end = new Date(`${today} ${breakItem.endTime}`);
-            return total + (end.getTime() - start.getTime()) / (1000 * 60);
-          }
-          return total;
-        }, 0);
-
-        // Calculate total hours worked (excluding breaks)
-        const clockInTime = new Date(`${today} ${record.clockIn}`);
-        const clockOutTime = new Date(`${today} ${currentTimeStr}`);
-        const totalMinutes = (clockOutTime.getTime() - clockInTime.getTime()) / (1000 * 60);
-        const netWorkMinutes = totalMinutes - totalBreakMinutes;
-        const totalHours = Math.max(0, netWorkMinutes / 60);
-        
-        return {
-          ...record,
-          clockOut: currentTimeStr,
-          totalHours: Math.round(totalHours * 100) / 100,
-          breaks: updatedBreaks,
-          status: 'early_leave', // Mark as early leave since it's auto logout
-          notes: (record.notes || '') + (record.notes ? ' | ' : '') + 'Auto logged out at end of day'
-        };
-      }
-      return record;
-    }));
-    
-    setIsWorking(false);
-    setIsOnBreak(false);
-    setCurrentBreakStart(null);
-  };
   const handleClockInOut = () => {
     const today = new Date().toISOString().split('T')[0];
     const currentTimeStr = new Date().toLocaleTimeString('en-US', { 
