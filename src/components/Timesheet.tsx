@@ -203,7 +203,10 @@ const Timesheet: React.FC<TimesheetProps> = ({ attendanceRecords }) => {
                   Clock Out
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Total Hours
+                  Work Hours
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Break Time
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
@@ -230,7 +233,10 @@ const Timesheet: React.FC<TimesheetProps> = ({ attendanceRecords }) => {
                     {record.clockOut || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {record.totalHours.toFixed(1)}h
+                    {(record.netWorkHours || record.totalHours).toFixed(1)}h
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {record.totalBreakTime ? `${record.totalBreakTime.toFixed(1)}h` : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(record.status)}`}>
