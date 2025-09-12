@@ -44,14 +44,12 @@ const Reports: React.FC<ReportsProps> = ({ attendanceRecords }) => {
     
     if (format === 'csv') {
       const csvContent = [
-        ['Date', 'Clock In', 'Clock Out', 'Total Hours', 'Break Time', 'Net Work Hours', 'Status', 'Notes'],
+        ['Date', 'Clock In', 'Clock Out', 'Total Hours', 'Status', 'Notes'],
         ...filteredRecords.map(record => [
           record.date,
           record.clockIn || '',
           record.clockOut || '',
           record.totalHours.toString(),
-          (record.totalBreakTime || 0).toString(),
-          (record.netWorkHours || record.totalHours).toString(),
           record.status,
           record.notes || ''
         ])
@@ -72,9 +70,9 @@ const Reports: React.FC<ReportsProps> = ({ attendanceRecords }) => {
     const filteredRecords = getFilteredRecords();
     
     return {
-      totalHours: filteredRecords.reduce((sum, record) => sum + (record.netWorkHours || record.totalHours), 0),
+      totalHours: filteredRecords.reduce((sum, record) => sum + record.totalHours, 0),
       averageHours: filteredRecords.length > 0 ? 
-        filteredRecords.reduce((sum, record) => sum + (record.netWorkHours || record.totalHours), 0) / filteredRecords.length : 0,
+        filteredRecords.reduce((sum, record) => sum + record.totalHours, 0) / filteredRecords.length : 0,
       presentDays: filteredRecords.filter(record => record.status === 'present').length,
       attendanceRate: filteredRecords.length > 0 ? 
         (filteredRecords.filter(record => record.status === 'present').length / filteredRecords.length) * 100 : 0
