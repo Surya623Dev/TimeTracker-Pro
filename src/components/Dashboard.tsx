@@ -48,7 +48,7 @@ const Dashboard: React.FC<DashboardProps> = ({ attendanceRecords, setAttendanceR
     const today = new Date().toISOString().split('T')[0];
     const record = attendanceRecords.find(r => r.date === today);
     setTodayRecord(record || null);
-    setIsWorking(record?.clockIn && !record?.clockOut);
+    setIsWorking(!!(record?.clockIn && !record?.clockOut));
     
     // Check if currently on break
     if (record?.breaks) {
@@ -107,7 +107,9 @@ const Dashboard: React.FC<DashboardProps> = ({ attendanceRecords, setAttendanceR
       minute: '2-digit' 
     });
 
-    if (!isWorking) {
+    const existingRecord = attendanceRecords.find(r => r.date === today);
+    
+    if (!existingRecord || !existingRecord.clockIn) {
       // Clock In
       const newRecord: AttendanceRecord = {
         id: Date.now().toString(),
@@ -120,9 +122,18 @@ const Dashboard: React.FC<DashboardProps> = ({ attendanceRecords, setAttendanceR
         status: 'present',
         notes: ''
       };
-      setAttendanceRecords(prev => [...prev, newRecord]);
+      
+      if (existingRecord) {
+        // Update existing record
+        setAttendanceRecords(prev => prev.map(record => 
+          record.date === today ? newRecord : record
+        ));
+      } else {
+        // Add new record
+        setAttendanceRecords(prev => [...prev, newRecord]);
+      }
       setIsWorking(true);
-    } else {
+    } else if (existingRecord.clockIn && !existingRecord.clockOut) {
       // Clock Out
       setAttendanceRecords(prev => prev.map(record => {
         if (record.date === today && !record.clockOut) {
