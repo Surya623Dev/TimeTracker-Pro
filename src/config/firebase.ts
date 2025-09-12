@@ -2,9 +2,9 @@ import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: "your-api-key",
+  apiKey: "AIzaSyAyHXzcsnfBI3k4LfqKvyyLHtOO9z5RQ5Q",
   authDomain: "your-project.firebaseapp.com",
-  projectId: "your-project-id",
+  projectId: "timetracker-30e54",
   storageBucket: "your-project.appspot.com",
   messagingSenderId: "123456789",
   appId: "your-app-id"
