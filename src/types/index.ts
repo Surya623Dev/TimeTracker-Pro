@@ -1,5 +1,6 @@
 export interface AttendanceRecord {
   id: string;
+  userId: string;
   date: string;
   clockIn?: string;
   clockOut?: string;

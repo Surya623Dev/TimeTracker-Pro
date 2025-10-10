@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Calendar, TrendingUp, Play, Square, AlertCircle } from 'lucide-react';
+import { collection, addDoc, updateDoc, doc, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../config/firebase';
+import { useAuth } from '../contexts/AuthContext';
 import { AttendanceRecord } from '../types';
 
 interface DashboardProps {
@@ -11,6 +14,7 @@ const Dashboard: React.FC<DashboardProps> = ({ attendanceRecords, setAttendanceR
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isWorking, setIsWorking] = useState(false);
   const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null);
+  const { currentUser } = useAuth();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -27,43 +31,48 @@ const Dashboard: React.FC<DashboardProps> = ({ attendanceRecords, setAttendanceR
     setIsWorking(record?.clockIn && !record?.clockOut);
   }, [attendanceRecords]);
 
-  const handleClockInOut = () => {
+  const handleClockInOut = async () => {
+    if (!currentUser) return;
+
     const today = new Date().toISOString().split('T')[0];
-    const currentTimeStr = new Date().toLocaleTimeString('en-US', { 
-      hour12: false, 
-      hour: '2-digit', 
-      minute: '2-digit' 
+    const currentTimeStr = new Date().toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit'
     });
 
     if (!isWorking) {
-      // Clock In
-      const newRecord: AttendanceRecord = {
-        id: Date.now().toString(),
-        date: today,
-        clockIn: currentTimeStr,
-        totalHours: 0,
-        status: 'present',
-        notes: ''
-      };
-      setAttendanceRecords(prev => [...prev, newRecord]);
-      setIsWorking(true);
+      try {
+        const newRecord = {
+          userId: currentUser.uid,
+          date: today,
+          clockIn: currentTimeStr,
+          totalHours: 0,
+          status: 'present',
+          notes: ''
+        };
+        await addDoc(collection(db, 'attendanceRecords'), newRecord);
+        setIsWorking(true);
+      } catch (error) {
+        console.error('Error clocking in:', error);
+      }
     } else {
-      // Clock Out
-      setAttendanceRecords(prev => prev.map(record => {
-        if (record.date === today && !record.clockOut) {
-          const clockInTime = new Date(`${today} ${record.clockIn}`);
+      try {
+        if (todayRecord) {
+          const clockInTime = new Date(`${today} ${todayRecord.clockIn}`);
           const clockOutTime = new Date(`${today} ${currentTimeStr}`);
           const totalHours = (clockOutTime.getTime() - clockInTime.getTime()) / (1000 * 60 * 60);
-          
-          return {
-            ...record,
+
+          const recordRef = doc(db, 'attendanceRecords', todayRecord.id);
+          await updateDoc(recordRef, {
             clockOut: currentTimeStr,
             totalHours: Math.round(totalHours * 100) / 100
-          };
+          });
+          setIsWorking(false);
         }
-        return record;
-      }));
-      setIsWorking(false);
+      } catch (error) {
+        console.error('Error clocking out:', error);
+      }
     }
   };
 
