@@ -22,19 +22,55 @@ const Timesheet: React.FC<TimesheetProps> = ({ attendanceRecords }) => {
     return matchesDate && matchesSearch;
   });
 
+  // Aggregate records by date
+  const aggregatedRecords = Object.values(filteredRecords.reduce((acc, record) => {
+    if (!acc[record.date]) {
+      acc[record.date] = {
+        ...record,
+        clockIn: record.clockIn,
+        clockOut: record.clockOut,
+        totalHours: 0,
+        notes: record.notes || ''
+      };
+    } else {
+        // Merge notes if distinct
+        if (record.notes && !acc[record.date].notes?.includes(record.notes)) {
+             acc[record.date].notes = acc[record.date].notes ? `${acc[record.date].notes}; ${record.notes}` : record.notes;
+        }
+    }
+
+    acc[record.date].totalHours += record.totalHours;
+
+    // Min Clock In
+    if (record.clockIn && (!acc[record.date].clockIn || record.clockIn < acc[record.date].clockIn!)) {
+      acc[record.date].clockIn = record.clockIn;
+    }
+
+    // Max Clock Out
+    if (record.clockOut && (!acc[record.date].clockOut || record.clockOut > acc[record.date].clockOut!)) {
+      acc[record.date].clockOut = record.clockOut;
+    }
+    
+    // Priority Status
+    if (record.status === 'present') acc[record.date].status = 'present';
+    else if (record.status === 'late' && acc[record.date].status !== 'present') acc[record.date].status = 'late';
+    
+    return acc;
+  }, {} as Record<string, AttendanceRecord>)).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
-  const years = [2022, 2023, 2024, 2025];
+  const years = [2022, 2023, 2024, 2025, 2026];
 
   const getTotalHours = () => {
-    return filteredRecords.reduce((total, record) => total + record.totalHours, 0);
+    return aggregatedRecords.reduce((total, record) => total + record.totalHours, 0);
   };
 
   const getWorkingDays = () => {
-    return filteredRecords.filter(record => record.status === 'present').length;
+    return aggregatedRecords.filter(record => record.status === 'present').length;
   };
 
   const getAverageHours = () => {
@@ -47,11 +83,11 @@ const Timesheet: React.FC<TimesheetProps> = ({ attendanceRecords }) => {
     if (format === 'csv') {
       const csvContent = [
         ['Date', 'Clock In', 'Clock Out', 'Total Hours', 'Status', 'Notes'],
-        ...filteredRecords.map(record => [
+        ...aggregatedRecords.map(record => [
           record.date,
           record.clockIn || '',
           record.clockOut || '',
-          record.totalHours.toString(),
+          record.totalHours.toFixed(2),
           record.status,
           record.notes || ''
         ])
@@ -214,8 +250,8 @@ const Timesheet: React.FC<TimesheetProps> = ({ attendanceRecords }) => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredRecords.map((record) => (
-                <tr key={record.id} className="hover:bg-gray-50">
+              {aggregatedRecords.map((record) => (
+                <tr key={record.date} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {new Date(record.date).toLocaleDateString('en-US', {
                       weekday: 'short',
@@ -246,7 +282,7 @@ const Timesheet: React.FC<TimesheetProps> = ({ attendanceRecords }) => {
           </table>
         </div>
 
-        {filteredRecords.length === 0 && (
+        {aggregatedRecords.length === 0 && (
           <div className="text-center py-12">
             <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No records found</h3>
