@@ -23,7 +23,7 @@ const Reports: React.FC<ReportsProps> = ({ attendanceRecords }) => {
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
-  const years = [2022, 2023, 2024, 2025];
+  const years = [2022, 2023, 2024, 2025, 2026];
 
   const getFilteredRecords = () => {
     return attendanceRecords.filter(record => {
@@ -39,17 +39,50 @@ const Reports: React.FC<ReportsProps> = ({ attendanceRecords }) => {
     });
   };
 
+  const getAggregatedRecords = (records: AttendanceRecord[]) => {
+      return Object.values(records.reduce((acc, record) => {
+          if (!acc[record.date]) {
+              acc[record.date] = { 
+                  ...record, 
+                  totalHours: 0,
+                  clockIn: record.clockIn,
+                  clockOut: record.clockOut
+              };
+          }
+          
+          acc[record.date].totalHours += record.totalHours;
+
+          // Status priority: present > late > early_leave > absent
+          // This logic can be adjusted based on requirements
+          if (record.status === 'present') acc[record.date].status = 'present';
+          else if (record.status === 'late' && acc[record.date].status !== 'present') acc[record.date].status = 'late';
+          
+          // Min Clock In
+          if (record.clockIn && (!acc[record.date].clockIn || record.clockIn < acc[record.date].clockIn!)) {
+              acc[record.date].clockIn = record.clockIn;
+          }
+
+          // Max Clock Out
+          if (record.clockOut && (!acc[record.date].clockOut || record.clockOut > acc[record.date].clockOut!)) {
+              acc[record.date].clockOut = record.clockOut;
+          }
+
+          return acc;
+      }, {} as Record<string, AttendanceRecord>));
+  };
+
   const generateReport = (format: 'csv' | 'excel') => {
     const filteredRecords = getFilteredRecords();
+    const aggregatedRecords = getAggregatedRecords(filteredRecords);
     
     if (format === 'csv') {
       const csvContent = [
         ['Date', 'Clock In', 'Clock Out', 'Total Hours', 'Status', 'Notes'],
-        ...filteredRecords.map(record => [
+        ...aggregatedRecords.map(record => [
           record.date,
           record.clockIn || '',
           record.clockOut || '',
-          record.totalHours.toString(),
+          record.totalHours.toFixed(2),
           record.status,
           record.notes || ''
         ])
@@ -68,14 +101,15 @@ const Reports: React.FC<ReportsProps> = ({ attendanceRecords }) => {
 
   const getDashboardStats = () => {
     const filteredRecords = getFilteredRecords();
+    const aggregatedRecords = getAggregatedRecords(filteredRecords);
     
     return {
-      totalHours: filteredRecords.reduce((sum, record) => sum + record.totalHours, 0),
-      averageHours: filteredRecords.length > 0 ? 
-        filteredRecords.reduce((sum, record) => sum + record.totalHours, 0) / filteredRecords.length : 0,
-      presentDays: filteredRecords.filter(record => record.status === 'present').length,
-      attendanceRate: filteredRecords.length > 0 ? 
-        (filteredRecords.filter(record => record.status === 'present').length / filteredRecords.length) * 100 : 0
+      totalHours: aggregatedRecords.reduce((sum, record) => sum + record.totalHours, 0),
+      averageHours: aggregatedRecords.length > 0 ? 
+        aggregatedRecords.reduce((sum, record) => sum + record.totalHours, 0) / aggregatedRecords.length : 0,
+      presentDays: aggregatedRecords.filter(record => record.status === 'present').length,
+      attendanceRate: aggregatedRecords.length > 0 ? 
+        (aggregatedRecords.filter(record => record.status === 'present').length / aggregatedRecords.length) * 100 : 0
     };
   };
 
@@ -99,11 +133,12 @@ const Reports: React.FC<ReportsProps> = ({ attendanceRecords }) => {
 
   const getAttendanceBreakdown = () => {
     const filteredRecords = getFilteredRecords();
+    const aggregatedRecords = getAggregatedRecords(filteredRecords);
     const breakdown = {
-      present: filteredRecords.filter(r => r.status === 'present').length,
-      late: filteredRecords.filter(r => r.status === 'late').length,
-      absent: filteredRecords.filter(r => r.status === 'absent').length,
-      earlyLeave: filteredRecords.filter(r => r.status === 'early_leave').length
+      present: aggregatedRecords.filter(r => r.status === 'present').length,
+      late: aggregatedRecords.filter(r => r.status === 'late').length,
+      absent: aggregatedRecords.filter(r => r.status === 'absent').length,
+      earlyLeave: aggregatedRecords.filter(r => r.status === 'early_leave').length
     };
     
     const total = Object.values(breakdown).reduce((sum, count) => sum + count, 0);
