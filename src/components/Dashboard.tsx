@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Calendar, TrendingUp, Play, Square, AlertCircle } from 'lucide-react';
-import { collection, addDoc, updateDoc, doc, query, where, getDocs } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { AttendanceRecord } from '../types';
@@ -14,6 +14,7 @@ const Dashboard: React.FC<DashboardProps> = ({ attendanceRecords, setAttendanceR
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isWorking, setIsWorking] = useState(false);
   const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null);
+  const [todaysRecords, setTodaysRecords] = useState<AttendanceRecord[]>([]);
   const { currentUser } = useAuth();
 
   useEffect(() => {
@@ -26,9 +27,13 @@ const Dashboard: React.FC<DashboardProps> = ({ attendanceRecords, setAttendanceR
 
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
-    const record = attendanceRecords.find(r => r.date === today);
-    setTodayRecord(record || null);
-    setIsWorking(record?.clockIn && !record?.clockOut);
+    const records = attendanceRecords.filter(r => r.date === today);
+    setTodaysRecords(records);
+    
+    // Find active record (clocked in but not out)
+    const active = records.find(r => r.clockIn && !r.clockOut);
+    setTodayRecord(active || null);
+    setIsWorking(!!active);
   }, [attendanceRecords]);
 
   const handleClockInOut = async () => {
@@ -50,9 +55,12 @@ const Dashboard: React.FC<DashboardProps> = ({ attendanceRecords, setAttendanceR
           totalHours: 0,
           status: 'present',
           notes: ''
-        };
+        } as any; // using any to bypass strict type check for now if needed, though matching AttendanceRecord is better
+        
+        // Optimistic update if needed, but we rely on listener usually. 
+        // For now, standard firebase pattern.
         await addDoc(collection(db, 'attendanceRecords'), newRecord);
-        setIsWorking(true);
+        // State updates will happen via the onSnapshot listener in parent component
       } catch (error) {
         console.error('Error clocking in:', error);
       }
@@ -68,7 +76,6 @@ const Dashboard: React.FC<DashboardProps> = ({ attendanceRecords, setAttendanceR
             clockOut: currentTimeStr,
             totalHours: Math.round(totalHours * 100) / 100
           });
-          setIsWorking(false);
         }
       } catch (error) {
         console.error('Error clocking out:', error);
@@ -77,13 +84,26 @@ const Dashboard: React.FC<DashboardProps> = ({ attendanceRecords, setAttendanceR
   };
 
   const getCurrentWorkingHours = () => {
-    if (todayRecord?.clockIn && !todayRecord?.clockOut) {
+    let total = 0;
+    
+    // Sum hours from all completed records today
+    todaysRecords.forEach(r => {
+      if (r.clockOut) {
+        total += r.totalHours;
+      }
+    });
+
+    // Add current session hours if working
+    if (isWorking && todayRecord?.clockIn) {
       const clockInTime = new Date(`${todayRecord.date} ${todayRecord.clockIn}`);
       const now = new Date();
       const hours = (now.getTime() - clockInTime.getTime()) / (1000 * 60 * 60);
-      return Math.round(hours * 100) / 100;
+      if (hours > 0) {
+        total += hours;
+      }
     }
-    return todayRecord?.totalHours || 0;
+    
+    return Math.round(total * 100) / 100;
   };
 
   const getWeeklyHours = () => {
@@ -108,6 +128,56 @@ const Dashboard: React.FC<DashboardProps> = ({ attendanceRecords, setAttendanceR
                recordDate.getFullYear() === thisYear;
       })
       .reduce((total, record) => total + record.totalHours, 0);
+  };
+
+  // Helper to aggregate records by date for Recent Activity
+  const getAggregatedRecentActivity = () => {
+    const grouped: { [key: string]: { date: string, clockIn: string, clockOut: string, hours: number } } = {};
+
+    // Sort records by date and time
+    const sortedRecords = [...attendanceRecords].sort((a, b) => {
+        return new Date(a.date + ' ' + (a.clockIn || '00:00')).getTime() - new Date(b.date + ' ' + (b.clockIn || '00:00')).getTime();
+    });
+
+    sortedRecords.forEach(record => {
+        if (!grouped[record.date]) {
+            grouped[record.date] = {
+                date: record.date,
+                clockIn: record.clockIn || '-',
+                clockOut: record.clockOut || 'In Progress',
+                hours: 0
+            };
+        }
+        
+        // Keep the earliest clockIn
+        // Update clockOut to the latest, or 'In Progress' if any session is in progress
+        const currentGroup = grouped[record.date];
+        
+        if (record.clockOut) {
+             // If we already have 'In Progress', keep it? Or logic:
+             // If this record is completed, we just add hours.
+             // We update clockOut to this one if the currentGroup clockOut is not 'In Progress' and this one is later?
+             // Simplification: Set clockOut to the latest record's clockOut.
+             // If ANY record on this day is in progress, the day is in progress.
+             if (currentGroup.clockOut !== 'In Progress') {
+                 currentGroup.clockOut = record.clockOut;
+             }
+        } else {
+            currentGroup.clockOut = 'In Progress';
+        }
+        
+        currentGroup.hours += record.totalHours;
+    });
+
+    return Object.values(grouped)
+        .slice(-5)
+        .reverse()
+        .map(item => ({
+            date: new Date(item.date).toLocaleDateString(),
+            clockIn: item.clockIn,
+            clockOut: item.clockOut,
+            hours: item.hours.toFixed(1)
+        }));
   };
 
   const stats = [
@@ -145,15 +215,7 @@ const Dashboard: React.FC<DashboardProps> = ({ attendanceRecords, setAttendanceR
     }
   ];
 
-  const recentActivity = attendanceRecords
-    .slice(-5)
-    .reverse()
-    .map(record => ({
-      date: new Date(record.date).toLocaleDateString(),
-      clockIn: record.clockIn || '-',
-      clockOut: record.clockOut || 'In Progress',
-      hours: record.totalHours.toFixed(1)
-    }));
+  const recentActivity = getAggregatedRecentActivity();
 
   return (
     <div className="space-y-6">
