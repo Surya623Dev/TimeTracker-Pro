@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Calendar, TrendingUp, Play, Square, AlertCircle } from 'lucide-react';
-import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { useAuth } from '../contexts/AuthContext';
 import { AttendanceRecord } from '../types';
@@ -24,6 +24,44 @@ const Dashboard: React.FC<DashboardProps> = ({ attendanceRecords, setAttendanceR
 
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    const autoClockOutYesterday = async () => {
+      if (!currentUser) return;
+
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayDate = yesterday.toISOString().split('T')[0];
+
+      try {
+        const q = query(
+          collection(db, 'attendanceRecords'),
+          where('userId', '==', currentUser.uid),
+          where('date', '==', yesterdayDate),
+          where('clockOut', '==', null)
+        );
+
+        const snapshot = await getDocs(q);
+
+        snapshot.forEach(async (docSnap) => {
+          const record = docSnap.data() as AttendanceRecord;
+          const clockInTime = new Date(`${yesterdayDate} ${record.clockIn}`);
+          const clockOutTime = new Date(`${yesterdayDate} 23:59:59`);
+          const totalHours = (clockOutTime.getTime() - clockInTime.getTime()) / (1000 * 60 * 60);
+
+          const recordRef = doc(db, 'attendanceRecords', docSnap.id);
+          await updateDoc(recordRef, {
+            clockOut: '23:59',
+            totalHours: Math.round(totalHours * 100) / 100
+          });
+        });
+      } catch (error) {
+        console.error('Error in auto clock-out:', error);
+      }
+    };
+
+    autoClockOutYesterday();
+  }, [currentUser]);
 
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
