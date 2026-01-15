@@ -74,7 +74,7 @@ const Reports: React.FC<ReportsProps> = ({ attendanceRecords }) => {
   const generateReport = (format: 'csv' | 'excel') => {
     const filteredRecords = getFilteredRecords();
     const aggregatedRecords = getAggregatedRecords(filteredRecords);
-    
+
     if (format === 'csv') {
       const csvContent = [
         ['Date', 'Clock In', 'Clock Out', 'Total Hours', 'Status', 'Notes'],
@@ -87,13 +87,34 @@ const Reports: React.FC<ReportsProps> = ({ attendanceRecords }) => {
           record.notes || ''
         ])
       ];
-      
+
       const csvString = csvContent.map(row => row.join(',')).join('\n');
       const blob = new Blob([csvString], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `report-${selectedPeriod}-${selectedYear}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } else if (format === 'excel') {
+      const excelContent = [
+        ['Date', 'Clock In', 'Clock Out', 'Total Hours', 'Status', 'Notes'],
+        ...aggregatedRecords.map(record => [
+          record.date,
+          record.clockIn || '',
+          record.clockOut || '',
+          record.totalHours.toFixed(2),
+          record.status,
+          record.notes || ''
+        ])
+      ];
+
+      const excelString = excelContent.map(row => row.join('\t')).join('\n');
+      const blob = new Blob([excelString], { type: 'application/vnd.ms-excel' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `report-${selectedPeriod}-${selectedYear}.xls`;
       a.click();
       window.URL.revokeObjectURL(url);
     }
