@@ -26,41 +26,50 @@ const Dashboard: React.FC<DashboardProps> = ({ attendanceRecords, setAttendanceR
   }, []);
 
   useEffect(() => {
-    const autoClockOutYesterday = async () => {
+    const autoClockOutPastRecords = async () => {
       if (!currentUser) return;
 
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayDate = yesterday.toISOString().split('T')[0];
+      const today = new Date().toISOString().split('T')[0];
 
       try {
         const q = query(
           collection(db, 'attendanceRecords'),
-          where('userId', '==', currentUser.uid),
-          where('date', '==', yesterdayDate),
-          where('clockOut', '==', null)
+          where('userId', '==', currentUser.uid)
         );
 
         const snapshot = await getDocs(q);
 
-        snapshot.forEach(async (docSnap) => {
-          const record = docSnap.data() as AttendanceRecord;
-          const clockInTime = new Date(`${yesterdayDate} ${record.clockIn}`);
-          const clockOutTime = new Date(`${yesterdayDate} 23:59:59`);
-          const totalHours = (clockOutTime.getTime() - clockInTime.getTime()) / (1000 * 60 * 60);
+        const updates: Promise<void>[] = [];
 
-          const recordRef = doc(db, 'attendanceRecords', docSnap.id);
-          await updateDoc(recordRef, {
-            clockOut: '23:59',
-            totalHours: Math.round(totalHours * 100) / 100
-          });
+        snapshot.forEach((docSnap) => {
+          const record = docSnap.data() as AttendanceRecord;
+
+          if (record.date < today && (!record.clockOut || record.clockOut === null)) {
+            const clockInTime = new Date(`${record.date} ${record.clockIn}`);
+            const clockOutTime = new Date(`${record.date} 23:59:59`);
+            const totalHours = (clockOutTime.getTime() - clockInTime.getTime()) / (1000 * 60 * 60);
+
+            const recordRef = doc(db, 'attendanceRecords', docSnap.id);
+            const updatePromise = updateDoc(recordRef, {
+              clockOut: '23:59',
+              totalHours: Math.round(totalHours * 100) / 100
+            });
+
+            updates.push(updatePromise);
+          }
         });
+
+        await Promise.all(updates);
+
+        if (updates.length > 0) {
+          console.log(`Auto-clocked out ${updates.length} past record(s)`);
+        }
       } catch (error) {
         console.error('Error in auto clock-out:', error);
       }
     };
 
-    autoClockOutYesterday();
+    autoClockOutPastRecords();
   }, [currentUser]);
 
   useEffect(() => {
@@ -90,15 +99,13 @@ const Dashboard: React.FC<DashboardProps> = ({ attendanceRecords, setAttendanceR
           userId: currentUser.uid,
           date: today,
           clockIn: currentTimeStr,
+          clockOut: null,
           totalHours: 0,
           status: 'present',
           notes: ''
-        } as any; // using any to bypass strict type check for now if needed, though matching AttendanceRecord is better
-        
-        // Optimistic update if needed, but we rely on listener usually. 
-        // For now, standard firebase pattern.
+        };
+
         await addDoc(collection(db, 'attendanceRecords'), newRecord);
-        // State updates will happen via the onSnapshot listener in parent component
       } catch (error) {
         console.error('Error clocking in:', error);
       }
